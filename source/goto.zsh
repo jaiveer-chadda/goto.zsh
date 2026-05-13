@@ -4,29 +4,120 @@ unalias g &>/dev/null || :
 alias g=goto
 
 # ——————————————————————————————————————————————————————————————————————————— #
+# ——————————————————————————————————————————————————————————————————————————— #
 
-goto() {
+function goto::directory() {
+  # if `$input` is a directory, `goto` acts pretty much exactly like `cd`
+  target="$input"
+}
+
+# ——————————————————————————————————————————————————————————————————————————— #
+
+function goto::file() {
+  # `:a` - resolve `./` and `../`
+  # `:h` - get the [h]ead of the file (eqv. to `dirname(1)`)
+  target="$input:a:h"
+}
+
+# ——————————————————————————————————————————————————————————————————————————— #
+
+function goto::function() {
+  # this'll output smth like `func is a shell function from /path/to/func.zsh`
+  local -H func_path="$( whence -v "$input" 2>/dev/null )"
+
+  # if the path doesn't have a slash in it, it's not a path
+  #  (in this case, the function is usually `an autoload shell function`)
+  if (( ${#func_path/\/} == $#func_path )) {
+    echo "$error $func_path, i.e. not defined in a file" >&2
+    return 1
+  }
+
+  # strip everything until the first `/` (where the path starts)
+  # then add the `/` back
+  func_path="/${func_path#*/}"
+  target="$func_path:h"  # then get the get the [h]ead of the file
+}
+
+# ——————————————————————————————————————————————————————————————————————————— #
+
+function goto::command() {
+  echo "$error \`command\` not implemented" >&2
+  return 1
+}
+
+# ——————————————————————————————————————————————————————————————————————————— #
+
+function goto::alias() {
+  echo "$error \`alias\` not implemented" >&2
+  return 1
+}
+
+# ——————————————————————————————————————————————————————————————————————————— #
+# ——————————————————————————————————————————————————————————————————————————— #
+
+# -q : no stdout
+# -Q : no stdout/stderr
+# -i : interactive
+
+function goto() {
+  setopt local_options warn_create_global
+
+  local -r reset=$'\e[m'
+  local -r   red=$'\e[31m'
+  local -r lblue=$'\e[94m'
+
   # concatenate the input with `$IFS`, so an unquoted input like
   #  `/path to/some dir` will be read as one argument: `"/path to/some dir"`
   local IFS=$' \t\n\0'
+  # note: `-H` is used on vars containing paths, to hide them from `abbrpath`
   local -rH input="${*:-"$OLDPWD"}"
-  local -r  error="\e[31m$0\e[m: couldn't find \e[94m\`$input\`\e[m"
-  local -H  goto=
 
-  if     [[ -d "$input" ]] { goto="$input:a"    # directory
-  } elif [[ -e "$input" ]] { goto="$input:a:h"  # file
+  local -r   input_hl="$lblue\`$input\`$reset"
+  local -r      error="$red$0$reset:"
+  local -r   no_input="$error must give an input."
+  local -r  not_found="$error couldn't find $input_hl."
+  local -r wrong_type="$error must be a function, command, or alias. $input_hl"
 
-  } elif [[ "$( type -w "$input" 2>/dev/null )" == *'function' ]] {  # function
-    local -H func_path="$( whence -v "$input" 2>/dev/null )"
+  # ———————————————————————————————————————————————————————————————————————— #
 
-    func_path="/${func_path#$input is*/}"
-    goto="$func_path:h"
+  # if no input was passed, and `$OLDPWD` is unset/empty, then exit
+  #  and blame it on on the user for not passing an input
+  if [[ -z "$input" ]] echo "$no_input" >&2 && return 1
 
-  } else { echo "$error" >&2; return 1; }
+  # ———————————————————————————————————————————————————————————————————————— #
 
-  { echo -n $'\e[94mcd\e[m '
-    abbrpath "$goto"
-  } >&2
+  local -H target=  # will be set by one of the sub-functions
 
-  cd "$goto" &>/dev/null || { echo "$error" >&2; return 1; }
+  if     [[ -d "$input" ]] { goto::directory
+  } elif [[ -e "$input" ]] { goto::file
+  } else {
+
+    local type="$( type -w "$input" )"  # outputs smth like `ls: alias`
+    type="${type##*: }"  # delete until the last colon, leaving `alias`
+
+    case "$type" {
+      ( function ) goto::function ;;
+      ( command  ) goto::command  ;;
+      ( alias    ) goto::alias    ;;
+      ( none     ) echo "$not_found"            >&2; return 1 ;;
+      ( *        ) echo "$wrong_type is $type." >&2; return 2 ;;
+    }
+  }
+
+  # if any of the `goto::...` functions fail, return their exit codes
+  #  they print their own error messages, so this main function doesn't have to
+  local -ri 10 exit_code=$?
+  if (( exit_code )) return exit_code
+
+  # ———————————————————————————————————————————————————————————————————————— #
+
+  # print the command that's about to be run
+  abbrpath -C cd "$target" >&2
+
+  cd "$target" &>/dev/null || {
+    echo "$not_found" >&2
+    return 1
+  }
 }
+
+# ——————————————————————————————————————————————————————————————————————————— #
