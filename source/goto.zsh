@@ -21,7 +21,7 @@ function goto::file() {
 
 # ——————————————————————————————————————————————————————————————————————————— #
 
-function goto::function() {
+function goto::func_cmd() {
   # this'll output smth like `func is a shell function from /path/to/func.zsh`
   local -H func_path="$( whence -v "$input" 2>/dev/null )"
 
@@ -36,20 +36,6 @@ function goto::function() {
   # then add the `/` back
   func_path="/${func_path#*/}"
   target="$func_path:h"  # then get the get the [h]ead of the file
-}
-
-# ——————————————————————————————————————————————————————————————————————————— #
-
-function goto::command() {
-  echo "$error \`command\` not implemented" >&2
-  return 1
-}
-
-# ——————————————————————————————————————————————————————————————————————————— #
-
-function goto::alias() {
-  echo "$error \`alias\` not implemented" >&2
-  return 1
 }
 
 # ——————————————————————————————————————————————————————————————————————————— #
@@ -92,15 +78,13 @@ function goto() {
   } elif [[ -e "$input" ]] { goto::file
   } else {
 
-    local type="$( type -w "$input" )"  # outputs smth like `ls: alias`
-    type="${type##*: }"  # delete until the last colon, leaving `alias`
+    local type="$( type -w "$input" )"  # outputs smth like `ls: command`
+    type="${type##*: }"  # delete until the last colon, leaving `command`
 
     case "$type" {
-      ( function ) goto::function ;;
-      ( command  ) goto::command  ;;
-      ( alias    ) goto::alias    ;;
-      ( none     ) echo "$not_found"            >&2; return 1 ;;
-      ( *        ) echo "$wrong_type is $type." >&2; return 2 ;;
+      ( command | function ) goto::func_cmd               ;;
+      ( none ) echo "$not_found"            >&2; return 1 ;;
+      ( *    ) echo "$wrong_type is $type." >&2; return 2 ;;
     }
   }
 
