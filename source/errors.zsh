@@ -3,18 +3,21 @@
 # ——————————————————————————————————————————————————————————————————————————— #
 
 function goto::error() {
+  if ! (( show_errors )) return 0
+
   local -r reset=$'\e[m' lblue=$'\e[94m' red=$'\e[31m'
   local -r sbt="$lblue\`" rbt="\`$reset"
 
   local -r error="${red}goto$reset: "
   local -r input_hl="$sbt$input$rbt"
 
-  echo -n "$error $input_hl "
+  echo -n "$error" >&2
 
   case "$1" {
-    ( input ) echo 'must give an input.'                    ;;
-    ( found ) echo 'not found.'                             ;;
-    ( nodef ) echo "$func_path, i.e. not defined in a file" ;;
+    ( input ) echo 'must give an input.'                     ;;
+    ( found ) echo "$input_hl not found."                    ;;
+    ( opts  ) echo "unknown option: $sbt$2$rbt."             ;;
+    ( nodef ) echo "$func_path, i.e. not defined in a file." ;;
 
     ( types )
       echo 'input must be a path, function, or command.' \
@@ -29,7 +32,7 @@ function goto::error() {
 
       echo "It's owner is $sbt$owner$rbt (group $sbt$group$rbt)"
     ;;
-  }
+  } >&2
 }
 
 # ——————————————————————————————————————————————————————————————————————————— #
@@ -46,5 +49,3 @@ function goto::get_owner() {
 }
 
 # ——————————————————————————————————————————————————————————————————————————— #
-
-# spell:ignore nodef
