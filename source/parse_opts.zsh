@@ -30,15 +30,25 @@ function goto::parse_opts() {
     #  so smth like `goto +ab -b-d` will be parsed as `goto +a +b -c -- -d`
     for char_opt in "${(@s::)opt#[-+]}"; { #
       case "$char_opt" {
-       ( L ) (( chase_links = ${#type#+} )) ;;
-       ( i ) (( interactive = ${#type#+} )) ;; 
-       ( q ) (( show_errors = ${#type#-} )) ;;
-       ( Q ) (( show_cd_cmd = ${#type#-} )) ;;
-       ( - ) break 2 ;;  # break on `--` or `+-`, per GNU standards
-       ( * ) goto::error opts $type$char_opt; return 1 ;;
+        ( L ) (( chase_links = ${#type#+} )) ;;
+        ( i ) (( interactive = ${#type#+} )) ;;
+        ( q ) (( show_errors = ${#type#-} )) ;;
+        ( Q ) (( show_cd_cmd = ${#type#-} )) ;;
+
+        ( [1-9] ) # we're gonna treat `-1`, `+2` etc. differently
+          # remove everything until the first number (`$char_opt`)
+          local -r num_to_end="$char_opt${opt#*$char_opt}"
+          # find digits joined to the first number, and prepend its sign (-/+)
+          relative_dir="$type${(*)num_to_end/#%(#b)([0-9]##)*/$match}"
+          break 2
+        ;;
+
+        ( - ) shift; break 2 ;;  # break on `--` or `+-`, per GNU standards
+        ( * ) goto::error opts $type$char_opt; return 1 ;;
       }
     }
   }
 
   inputs=( "$@" )
+  return 0
 }

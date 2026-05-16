@@ -10,8 +10,10 @@ function goto() {
   # note: `-H` is used on vars that hold paths, to hide them from `abbrpath`
   local -aH inputs
 
-  local -i 2 chase_links=0 interactive=0
-  local -i 2 show_errors=1 show_cd_cmd=1
+  local -i 2  chase_links=0 interactive=0
+  local -i 2  show_errors=1 show_cd_cmd=1
+  # local -i 10 relative_dir=0
+  local relative_dir=0
 
   # send the options off to be parsed
   #  `parse_opts` will set the opts and put the remaining inputs into `$inputs`
@@ -24,16 +26,19 @@ function goto() {
   local -H input="${(j: :)inputs}"
 
   # if no input was passed, or if it's all spaces, exit
-  if [[ "$input" =~ '^ *$' ]] { goto::error input; return 1; }
+  if [[ -z "$relative_dir" && "$input" =~ '^ *$' ]] {
+    goto::error input
+    return 1
+  }
 
   # ———————————————————————————————————————————————————————————————————————— #
 
   local -H target=  # will be set by one of the sub-functions
 
-  if     [[ -d "$input" ]] { goto::directory  # dir  - just act like `cd`
+  if    (( relative_dir )) { goto::relative   # -/+N - go fwd/back N dirs
+  } elif [[ -d "$input" ]] { goto::directory  # dir  - just act like `cd`
   } elif [[ -e "$input" ]] { goto::file       # file - go to the file's dir
-  } else {
-
+  } else {                                    # func - go to the its definition
     local type="$( type -w "$input" )"  # outputs smth like `ls: command`
     type="${type##*: }"  # delete until the last colon, leaving just `command`
 
