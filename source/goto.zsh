@@ -1,17 +1,5 @@
 #!/usr/bin/env zsh
 
-unalias g &>/dev/null || :
-alias g=goto
-typeset -a chpwd_functions=( "${(@)chpwd_functions}" )
-
-# ——————————————————————————————————————————————————————————————————————————— #
-# —— Main Method ———————————————————————————————————————————————————————————— #
-# ——————————————————————————————————————————————————————————————————————————— #
-
-# -q : no stdout
-# -Q : no stdout/stderr
-# -i : interactive
-
 function goto() {
   setopt local_options warn_create_global
 
@@ -31,8 +19,8 @@ function goto() {
 
   local -H target=  # will be set by one of the sub-functions
 
-  if     [[ -d "$input" ]] { target="$input"     # dir  - just act like `cd`
-  } elif [[ -e "$input" ]] { target="$input:a:h" # file - go to the file's dir
+  if     [[ -d "$input" ]] { goto::directory # dir  - just act like `cd`
+  } elif [[ -e "$input" ]] { goto::file      # file - go to the file's dir
   } else {
 
     local type="$( type -w "$input" )"  # outputs smth like `ls: command`
@@ -56,77 +44,4 @@ function goto() {
 
   # if `cd` succeeds, print the command that's about to be run
   abbrpath -C cd "$target" >&2
-
 }
-
-# ——————————————————————————————————————————————————————————————————————————— #
-# ——— Processing Functions —————————————————————————————————————————————————— #
-# ——————————————————————————————————————————————————————————————————————————— #
-
-function goto::command() {
-  # this'll output smth like `func is a shell function from /path/to/func.zsh`
-  local -H func_path="$( whence -v "$input" 2>/dev/null )"
-
-  # if the path doesn't have a slash in it, it's not a path
-  #  (in this case, the function is usually `an autoload shell function`)
-  if (( ${#func_path/\/} == $#func_path )) { goto::error nodef; return 1; }
-
-  # strip everything until the first `/` (where the path starts)
-  # then add the `/` back
-  func_path="/${func_path#*/}"
-  target="$func_path:h"  # then get the get the [h]ead of the file
-}
-
-# ——————————————————————————————————————————————————————————————————————————— #
-# —— Error Handling ————————————————————————————————————————————————————————— #
-# ——————————————————————————————————————————————————————————————————————————— #
-
-function goto::error() {
-  local -r reset=$'\e[m' lblue=$'\e[94m' red=$'\e[31m'
-  local -r sbt="$lblue\`" rbt="\`$reset"
-
-  local -r error="${red}goto$reset: "
-  local -r input_hl="$sbt$input$rbt"
-
-  echo -n "$error $input_hl "
-
-  case "$1" {
-    ( input ) echo 'must give an input.'                    ;;
-    ( found ) echo 'not found.'                             ;;
-    ( nodef ) echo "$func_path, i.e. not defined in a file" ;;
-
-    ( types )
-      echo 'input must be a path, function, or command.' \
-      "$input_hl is $type."
-    ;;
-
-    ( perms )
-      echo -n "you don't have the permissions to access $target. "
-
-      local owner group
-      goto::get_owner "$target" || { echo; return 0; }
-
-      echo "It's owner is $sbt$owner$rbt (group $sbt$group$rbt)"
-    ;;
-  }
-}
-
-# ——————————————————————————————————————————————————————————————————————————— #
-# —— Helper Functions ——————————————————————————————————————————————————————— #
-# ——————————————————————————————————————————————————————————————————————————— #
-
-function goto::get_owner() {
-  local -ri 10 delim=$RANDOM
-  local user_info=
-
-  user_info="$(  stat -c "%U$delim%G" "$1" 2>/dev/null )" || \
-  user_info="$( gstat -c "%U$delim%G" "$1" 2>/dev/null )" || return 1
-
-  owner="${user_info%$delim*}"
-  group="${user_info#*$delim}"
-}
-
-# ——————————————————————————————————————————————————————————————————————————— #
-# ——————————————————————————————————————————————————————————————————————————— #
-
-# spell:ignore nodef
