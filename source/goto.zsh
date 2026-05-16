@@ -6,6 +6,52 @@ alias g=goto
 # ——————————————————————————————————————————————————————————————————————————— #
 # ——————————————————————————————————————————————————————————————————————————— #
 
+function goto::get_owner() {
+  local -ri 10 delim=$RANDOM
+  local user_info=
+
+  user_info="$(  stat -c "%U$delim%G" "$1" 2>/dev/null )" || \
+  user_info="$( gstat -c "%U$delim%G" "$1" 2>/dev/null )" || return 1
+
+  owner="${user_info%$delim*}"
+  group="${user_info#*$delim}"
+}
+
+# ——————————————————————————————————————————————————————————————————————————— #
+
+function goto::error() {
+  local -r reset=$'\e[m' lblue=$'\e[94m' red=$'\e[31m'
+  local -r sbt="$lblue\`" rbt="\`$reset"
+
+  local -r error="${red}goto$reset: "
+  local -r input_hl="$sbt$input$rbt"
+
+  echo -n "$error $input_hl "
+
+  case "$1" {
+    ( input ) echo 'must give an input.'                    ;;
+    ( found ) echo 'not found.'                             ;;
+    ( nodef ) echo "$func_path, i.e. not defined in a file" ;;
+
+    ( types )
+      echo 'input must be a path, function, or command.' \
+      "$input_hl is $type."
+    ;;
+
+    ( perms )
+      echo -n "you don't have the permissions to access $target. "
+
+      local owner group
+      goto::get_owner "$target" || { echo; return 0; }
+
+      echo "It's owner is $sbt$owner$rbt (group $sbt$group$rbt)"
+    ;;
+  }
+}
+
+# ——————————————————————————————————————————————————————————————————————————— #
+# ——————————————————————————————————————————————————————————————————————————— #
+
 function goto::directory() {
   # if `$input` is a directory, `goto` acts pretty much exactly like `cd`
   target="$input"
@@ -21,16 +67,13 @@ function goto::file() {
 
 # ——————————————————————————————————————————————————————————————————————————— #
 
-function goto::func_cmd() {
+function goto::command() {
   # this'll output smth like `func is a shell function from /path/to/func.zsh`
   local -H func_path="$( whence -v "$input" 2>/dev/null )"
 
   # if the path doesn't have a slash in it, it's not a path
   #  (in this case, the function is usually `an autoload shell function`)
-  if (( ${#func_path/\/} == $#func_path )) {
-    echo "$error $func_path, i.e. not defined in a file" >&2
-    return 1
-  }
+  if (( ${#func_path/\/} == $#func_path )) { goto::error nodef; return 1; }
 
   # strip everything until the first `/` (where the path starts)
   # then add the `/` back
@@ -48,21 +91,11 @@ function goto::func_cmd() {
 function goto() {
   setopt local_options warn_create_global
 
-  local -r reset=$'\e[m'
-  local -r   red=$'\e[31m'
-  local -r lblue=$'\e[94m'
-
   # concatenate the input with `$IFS`, so an unquoted input like
   #  `/path to/some dir` will be read as one argument: `"/path to/some dir"`
   local IFS=$' \t\n\0'
   # note: `-H` is used on vars containing paths, to hide them from `abbrpath`
   local -rH input="${*:-"$OLDPWD"}"
-
-  local -r   input_hl="$lblue\`$input\`$reset"
-  local -r      error="$red$0$reset:"
-  local -r   no_input="$error must give an input."
-  local -r  not_found="$error couldn't find $input_hl."
-  local -r wrong_type="$error must be a function, command, or alias. $input_hl"
 
   # ———————————————————————————————————————————————————————————————————————— #
 
@@ -82,9 +115,9 @@ function goto() {
     type="${type##*: }"  # delete until the last colon, leaving `command`
 
     case "$type" {
-      ( command | function ) goto::func_cmd               ;;
-      ( none ) echo "$not_found"            >&2; return 1 ;;
-      ( *    ) echo "$wrong_type is $type." >&2; return 2 ;;
+      ( command | function ) goto::command ;;
+      ( none ) goto::error found; return 1 ;;
+      ( *    ) goto::error types; return 2 ;;
     }
   }
 
@@ -95,13 +128,13 @@ function goto() {
 
   # ———————————————————————————————————————————————————————————————————————— #
 
-  # print the command that's about to be run
+  ls "$target" &>/dev/null || { goto::error perms; return 1; }
+
+  # if `cd` succeeds, print the command that's about to be run
   abbrpath -C cd "$target" >&2
 
-  cd "$target" &>/dev/null || {
-    echo "$not_found" >&2
-    return 1
-  }
 }
 
 # ——————————————————————————————————————————————————————————————————————————— #
+
+# spell:ignore nodef
