@@ -2,6 +2,7 @@
 
 source "$0:h/errors.zsh"
 source "$0:h/processing.zsh"
+source "$0:h/parse_opts.zsh"
 
 source "$0:h/goto.zsh"
 
