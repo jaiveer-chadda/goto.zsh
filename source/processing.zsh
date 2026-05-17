@@ -4,7 +4,7 @@
 
 function goto::command() {
   # this'll output smth like `func is a shell function from /path/to/func.zsh`
-  local -H func_path="$( whence -v "$input" 2>/dev/null )"
+  local -H func_path="$( whence -v -- "$input" 2>/dev/null )"
 
   # if the path doesn't have a slash in it, it's not a path
   #  (in this case, the function is usually `an autoload shell function`)

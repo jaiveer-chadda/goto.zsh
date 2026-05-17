@@ -39,7 +39,7 @@ function goto() {
   } elif [[ -d "$input" ]] { goto::directory  # dir  - just act like `cd`
   } elif [[ -e "$input" ]] { goto::file       # file - go to the file's dir
   } else {                                    # func - go to the its definition
-    local type="$( type -w "$input" )"  # outputs smth like `ls: command`
+    local type="$( type -w -- "$input" )"  # outputs smth like `ls: command`
     type="${type##*: }"  # delete until the last colon, leaving just `command`
 
     case "$type" {
@@ -57,10 +57,10 @@ function goto() {
   # ———————————————————————————————————————————————————————————————————————— #
 
   # I can't think of why else `cd` would fail, other than lack of perms
-  ls "$target" &>/dev/null || { goto::error perms; return 3; }
+  ls -- "$target" &>/dev/null || { goto::error perms; return 3; }
 
   # if `cd` succeeds, print `cd $PATH_TO/target`
-  if (( show_cd_cmd )) abbrpath -C cd "$target" >&2
+  if (( show_cd_cmd )) abbrpath -C cd -- "$target" >&2
 
   return 0
 }
