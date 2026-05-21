@@ -15,9 +15,14 @@ function goto::error() {
 
   case "$1" {
     ( input ) echo 'must give an input.'                          ;;
-    ( found ) echo -E "$input_hl not found."                      ;;
+    ( found ) echo -E "couldn't find $input_hl."                  ;;
     ( opts  ) echo -E "unknown option: $sbt$2$rbt."               ;;
     ( nodef ) echo -E - "$func_path, i.e. not defined in a file." ;;
+
+    ( exist )
+      echo -nE "$sbt${target/#$HOME/~}$rbt doesn't exist. "
+      echo 'Removing it from history.'
+    ;;
 
     ( types )
       echo -n 'input must be a path, function, or command. '
@@ -26,11 +31,10 @@ function goto::error() {
 
     ( perms )
       echo -nE "you don't have the permissions to access $target. "
-
       local owner group
       goto::get_owner "$target" || { echo; return 0; }
 
-      echo -E "It's owner is $sbt$owner$rbt (group $sbt$group$rbt)"
+      echo -E "Its owner is $sbt$owner$rbt (group $sbt$group$rbt)"
     ;;
   } >&2
 }

@@ -12,8 +12,7 @@ function goto() {
 
   local -i 2  chase_links=0 interactive=0
   local -i 2  show_errors=1 show_cd_cmd=1
-  # local -i 10 relative_dir=0
-  local relative_dir=0
+  local -i 10 relative_dir=0
 
   # send the options off to be parsed
   #  `parse_opts` will set the opts and put the remaining inputs into `$inputs`
@@ -25,8 +24,8 @@ function goto() {
   #  `/path to/some dir` will be read as one argument: `"/path to/some dir"`
   local -H input="${(j: :)inputs}"
 
-  # if no input was passed, or if it's all spaces, exit
-  if [[ -z "$relative_dir" && "$input" =~ '^ *$' ]] {
+  # if no valid input was passed, or if it's all spaces
+  if [[ "$input" =~ '^ *$' && "$relative_dir" -eq 0 ]] {
     goto::error input
     return 1
   }
@@ -57,7 +56,7 @@ function goto() {
   # ———————————————————————————————————————————————————————————————————————— #
 
   # I can't think of why else `cd` would fail, other than lack of perms
-  ls -- "$target" &>/dev/null || { goto::error perms; return 3; }
+  cd -- "$target" &>/dev/null || { goto::error perms; return 3; }
 
   # if `cd` succeeds, print `cd $PATH_TO/target`
   if (( show_cd_cmd )) abbrpath -C cd -- "$target" >&2
